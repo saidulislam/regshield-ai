@@ -1,0 +1,74 @@
+{
+  "name": "RegShield - Overdue Escalation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 12 }]
+        }
+      },
+      "name": "Twice Daily Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/api/action-items/overdue",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth"
+      },
+      "name": "Fetch Overdue Items",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.overdue_notified}}",
+              "operation": "equals",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "name": "Filter Not Yet Notified",
+      "type": "n8n-nodes-base.filter",
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "escalations@regshield.ai",
+        "toEmail": "={{$json.primary_contact_email}}",
+        "subject": "[OVERDUE] Action Item: {{$json.title}} — {{$json.days_overdue}} days past deadline",
+        "html": "<h2 style='color: #E11D48;'>Overdue Action Item</h2><p><strong>{{$json.title}}</strong></p><p>Original Deadline: {{$json.deadline}}</p><p>Days Overdue: <strong style='color: #E11D48;'>{{$json.days_overdue}}</strong></p><p>Risk Level: {{$json.risk_level}}</p><p>This item requires immediate attention to maintain compliance posture.</p><p><a href='{{$json.portal_url}}'>Update Status Now</a></p><hr><p style='color: #94A3B8; font-size: 12px;'>Your RegShield AI compliance team has been notified of this overdue item.</p>"
+      },
+      "name": "Send Escalation Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/api/action-items/{{$json.id}}/mark-notified",
+        "method": "PATCH",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth"
+      },
+      "name": "Mark as Notified",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [850, 400]
+    }
+  ],
+  "connections": {
+    "Twice Daily Check": {
+      "main": [[{ "node": "Fetch Overdue Items", "type": "main", "index": 0 }]]
+    },
+    "Fetch Overdue Items": {
+      "main": [[{ "node": "Filter Not Yet Notified", "type": "main", "index": 0 }]]
+    },
+    "Filter Not Yet Notified": {
+      "main": [[{ "node": "Send Escalation Email", "type": "main", "index": 0 }, { "node": "Mark as Notified", "type": "main", "index": 0 }]]
+    }
+  }
+}

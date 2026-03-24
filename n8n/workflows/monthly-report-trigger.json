@@ -1,0 +1,76 @@
+{
+  "name": "RegShield - Monthly Report Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 8 1 * *" }]
+        }
+      },
+      "name": "1st of Month at 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/api/admin/clients?status=active",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth"
+      },
+      "name": "Fetch Active Clients",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Process Each Client",
+      "type": "n8n-nodes-base.splitInBatches",
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/api/reports/generate",
+        "method": "POST",
+        "body": {
+          "client_id": "={{$json.id}}",
+          "report_type": "monthly",
+          "period_start": "={{$today.minus({months: 1}).startOf('month').toISODate()}}",
+          "period_end": "={{$today.minus({months: 1}).endOf('month').toISODate()}}"
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth"
+      },
+      "name": "Generate Monthly Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "reports@regshield.ai",
+        "toEmail": "={{$json.primary_contact_email}}",
+        "subject": "Your Monthly Regulatory Change Report — {{$today.minus({months: 1}).toFormat('MMMM yyyy')}}",
+        "html": "<h2>Monthly Regulatory Change Report</h2><p>Hi {{$json.primary_contact_name}},</p><p>Your monthly regulatory change report for {{$today.minus({months: 1}).toFormat('MMMM yyyy')}} is ready.</p><p><strong>Summary:</strong></p><ul><li>Changes Processed: {{$json.changes_count}}</li><li>Action Items Created: {{$json.action_items_count}}</li><li>Items Completed: {{$json.completed_count}}</li><li>Compliance Score: {{$json.compliance_score}}/100</li></ul><p><a href='{{$json.report_url}}'>View Full Report in Portal</a></p><p>The PDF report is also attached to this email.</p>"
+      },
+      "name": "Send Report Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "1st of Month at 8 AM": {
+      "main": [[{ "node": "Fetch Active Clients", "type": "main", "index": 0 }]]
+    },
+    "Fetch Active Clients": {
+      "main": [[{ "node": "Process Each Client", "type": "main", "index": 0 }]]
+    },
+    "Process Each Client": {
+      "main": [[{ "node": "Generate Monthly Report", "type": "main", "index": 0 }]]
+    },
+    "Generate Monthly Report": {
+      "main": [[{ "node": "Send Report Email", "type": "main", "index": 0 }]]
+    }
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "name": "RegShield - Deadline Reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 24 }]
+        }
+      },
+      "name": "Daily Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.API_BASE_URL}}/api/action-items/upcoming?days=14",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth"
+      },
+      "name": "Fetch Upcoming Deadlines",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.days_until_deadline}}",
+              "operation": "smallerEqual",
+              "value2": 14
+            }
+          ]
+        }
+      },
+      "name": "Filter by Reminder Window",
+      "type": "n8n-nodes-base.filter",
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "reminders@regshield.ai",
+        "toEmail": "={{$json.assigned_email}}",
+        "subject": "Reminder: {{$json.title}} — Due in {{$json.days_until_deadline}} days",
+        "html": "<h2>Action Item Reminder</h2><p><strong>{{$json.title}}</strong></p><p>Deadline: {{$json.deadline}} ({{$json.days_until_deadline}} days remaining)</p><p>Priority: {{$json.priority_label}}</p><p>{{$json.description}}</p><p><a href='{{$json.portal_url}}'>Update Status in Portal</a></p>"
+      },
+      "name": "Send Reminder Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [850, 300]
+    }
+  ],
+  "connections": {
+    "Daily Check": {
+      "main": [[{ "node": "Fetch Upcoming Deadlines", "type": "main", "index": 0 }]]
+    },
+    "Fetch Upcoming Deadlines": {
+      "main": [[{ "node": "Filter by Reminder Window", "type": "main", "index": 0 }]]
+    },
+    "Filter by Reminder Window": {
+      "main": [[{ "node": "Send Reminder Email", "type": "main", "index": 0 }]]
+    }
+  }
+}
